@@ -44,6 +44,7 @@ _RETRY_STATUSES: set[int] = {429, 500, 502, 503, 504}
 __all__ = [
     "iter_requests",
     "request",
+    "ensure_session",
 ]
 
 
@@ -93,27 +94,38 @@ async def _consume_and_release(resp: aiohttp.ClientResponse) -> None:
 
 
 @asynccontextmanager
-async def _ensure_session(
-    session: Optional[aiohttp.ClientSession],
+async def ensure_session(
+    session: Optional[aiohttp.ClientSession] = None,
     *,
-    timeout: Optional[aiohttp.ClientTimeout | float],
-    max_concurrency: int,
+    timeout: Optional[aiohttp.ClientTimeout | float] = None,
+    max_concurrency: int = 10,
 ):
-    """Yield a session and close it on exit if we created it."""
-    if session is None:
-        created = True
-        effective_timeout = _resolve_timeout(timeout)
-        session = aiohttp.ClientSession(
-            connector=aiohttp.TCPConnector(limit=max_concurrency),
-            timeout=effective_timeout,
-        )
-    else:
-        created = False
-    try:
+    """Yield a session and close it on exit if created here.
+
+    Usage modes (mutually exclusive):
+    - Provide `session=` (non-None) and do NOT pass `timeout`/`max_concurrency`.
+      The provided session is yielded unchanged and not closed on exit.
+    - Omit `session` (or pass None) and provide both `timeout` (optional) and
+      `max_concurrency` (required). A new ClientSession is created and closed
+      when the context exits.
+    """
+    if session is not None:
+        if timeout is not None:
+            raise ValueError(
+                "Pass either session= or timeout/max_concurrency, not both."
+            )
+        # Caller-managed lifecycle
         yield session
+        return
+
+    _session = aiohttp.ClientSession(
+        connector=aiohttp.TCPConnector(limit=max_concurrency),
+        timeout=_resolve_timeout(timeout),
+    )
+    try:
+        yield _session
     finally:
-        if created:
-            await session.close()
+        await _session.close()
 
 
 async def _retry_loop(
@@ -521,9 +533,13 @@ async def iter_requests(
         if base_url_obj.path.endswith("/") and base_url_obj.path != "/":
             base_url_obj = base_url_obj.with_path(base_url_obj.path.rstrip("/"))
 
-    async with _ensure_session(
-        session, timeout=timeout, max_concurrency=max_concurrency
-    ) as session:
+    # Manage session lifecycle according to the rules of ensure_session
+    if session is None:
+        ctx = ensure_session(timeout=timeout, max_concurrency=max_concurrency)
+    else:
+        ctx = ensure_session(session=session)
+
+    async with ctx as session:
         # Worker-pool scheduler: keep ≤ max_concurrency tasks in flight
         pending_tasks: set[
             asyncio.Task[

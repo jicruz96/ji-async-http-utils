@@ -57,6 +57,40 @@ async def main():
         print(data["title"])  # e.g., "delectus aut autem"
 ```
 
+### Session helper: `ensure_session`
+
+`ensure_session` is an async context manager that yields a usable
+`aiohttp.ClientSession`.
+
+Modes (mutually exclusive):
+- Creation: `ensure_session(timeout=..., max_concurrency=...)` creates a new session
+  and closes it on exit.
+- Reuse: `ensure_session(session=existing)` yields your session unchanged and does
+  not close it on exit.
+
+```python
+import aiohttp
+from ji_async_http_utils.aiohttp import ensure_session, request
+
+async def main():
+    # Option A: create a managed session for this block
+    async with ensure_session(
+        timeout=aiohttp.ClientTimeout(total=20),
+        max_concurrency=32,
+    ) as session:
+        resp = await request(url="https://httpbin.org/json", session=session)
+        async with resp:
+            data = await resp.json()
+        print(data)
+
+    # Option B: reuse an existing session you manage elsewhere
+    async with aiohttp.ClientSession() as s:
+        async with ensure_session(session=s) as session:
+            resp = await request(url="https://httpbin.org/get", session=session)
+            async with resp:
+                print(resp.status)
+```
+
 ### Multiple requests with `iter_requests`
 
 ```python
@@ -310,6 +344,7 @@ Exports from `ji_async_http_utils.aiohttp`:
 
 - `iter_requests(items=..., ...) -> AsyncIterator[tuple[item, JSON | BaseException]]`
 - `request(url=..., session=..., ...) -> aiohttp.ClientResponse` (always raises on failure)
+- `ensure_session(session=existing)` or `ensure_session(timeout=..., max_concurrency=...)` -> Async context manager yielding `ClientSession`
 
 Key parameters:
 
