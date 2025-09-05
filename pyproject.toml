@@ -1,6 +1,6 @@
 [project]
 name = "ji-async-http-utils"
-version = "0.1.0"
+version = "0.1.1"
 description = "Async HTTP utilities using aiohttp and httpx."
 readme = "README.md"
 authors = [
