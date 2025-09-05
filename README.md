@@ -41,43 +41,29 @@ async def main():
 ### Single request with `request`
 
 ```python
+import aiohttp
 from ji_async_http_utils.aiohttp import request
 
 async def main():
-    data = await request(
-        url="https://jsonplaceholder.typicode.com/todos/1",
-        raise_on_error=True,  # raise instead of returning an Exception
-        timeout=15.0,
-    )
-    # `data` is parsed JSON (alias `JSON`)
-    print(data["title"])  # e.g., "delectus aut autem"
+    async with aiohttp.ClientSession(
+        timeout=aiohttp.ClientTimeout(total=15.0)
+    ) as session:
+        resp = await request(
+            url="https://jsonplaceholder.typicode.com/todos/1",
+            session=session,
+        )  # raises for non-2xx after retries
+        async with resp:
+            data = await resp.json()
+        print(data["title"])  # e.g., "delectus aut autem"
 ```
 
-### Range helper: inclusive [min_id, max_id]
-
-```python
-from ji_async_http_utils.aiohttp import iter_responses
-
-async def main():
-    async for user_id, data in iter_responses(
-        base_url="https://api.example.com/users",
-        items=range(100, 126),  # inclusive [100..125]
-        max_concurrency=32,
-        pbar="Users",
-    ):
-        print(user_id, data.get("id"))
-```
-
-### Reverse order and exclusions
+### Multiple requests with `iter_responses`
 
 ```python
 async def main():
-    ids = list(range(50, 0, -1))  # reverse from 50 down to 1
-    excluded = {3, 7, 9}
-    filtered = (i for i in ids if i not in excluded)
     async for i, data in iter_responses(
         base_url="https://example.com/docs",
-        items=filtered,
+        items=range(1, 101),
         pbar="Docs",
     ):
         # default assumes JSON; for non-JSON endpoints, pass on_result
@@ -323,7 +309,7 @@ async def cli_entry():
 Exports from `ji_async_http_utils.aiohttp`:
 
 - `iter_responses(items=..., ...) -> AsyncIterator[tuple[item, JSON | BaseException]]`
-- `request(url=..., ...) -> JSON | BaseException` (raises on failure if `raise_on_error=True`)
+- `request(url=..., session=..., ...) -> aiohttp.ClientResponse` (always raises on failure)
 
 Key parameters:
 
@@ -332,7 +318,7 @@ Key parameters:
 - `timeout`: total timeout (defaults to 60s if we create the session)
 - `method`: HTTP method literal ("GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS", "TRACE", "CONNECT")
 - `pbar`: progress toggle/label. `True` enables without a label; a string sets the label; `False` disables
-- `raise_on_error`: when `True`, failures are raised; when `False` (default), failures are yielded as Exceptions
+- `raise_on_error`: when `True`, failures are raised; when `False` (default), failures are yielded as Exceptions (only for `iter_responses`)
 - `retries`: retry count for retryable statuses/exceptions (429/5xx, client/timeouts)
 - `retry_statuses`: customize which HTTP status codes trigger a retry (default: 429, 500, 502, 503, 504)
 - `on_result` / `on_error`: async hooks for side effects
@@ -340,8 +326,8 @@ Key parameters:
 Return types:
 - Default (no `on_result`): yields parsed JSON (alias `JSON`), not `ClientResponse`.
 - With `on_result`: yields `ResultT` returned by your callback.
-- When `raise_on_error=False` (default), failures are yielded as `Exception`.
-- When `raise_on_error=True`, failures raise immediately and are not yielded.
+- When `raise_on_error=False` (default), failures are yielded as `Exception` (only for `iter_responses`).
+- When `raise_on_error=True`, failures raise immediately and are not yielded (only for `iter_responses`).
 
 Type-safety constraints (overloads guide editors):
 
