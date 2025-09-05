@@ -20,7 +20,7 @@ import aiohttp
 from tqdm.asyncio import tqdm
 from yarl import URL
 
-ItemT = TypeVar("ItemT", int, str)
+ItemT = TypeVar("ItemT")
 ResultT = TypeVar("ResultT")
 
 # A JSON value returned by `resp.json()`
