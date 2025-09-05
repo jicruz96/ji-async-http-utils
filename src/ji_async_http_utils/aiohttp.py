@@ -42,7 +42,7 @@ HTTPMethod = Literal[
 _RETRY_STATUSES: set[int] = {429, 500, 502, 503, 504}
 
 __all__ = [
-    "iter_responses",
+    "iter_requests",
     "request",
 ]
 
@@ -168,7 +168,7 @@ async def _retry_loop(
 
 
 @overload
-def iter_responses(
+def iter_requests(
     *,
     base_url: str,
     max_concurrency: int = 32,
@@ -191,7 +191,7 @@ def iter_responses(
 
 
 @overload
-def iter_responses(
+def iter_requests(
     *,
     base_url: str,
     max_concurrency: int = 32,
@@ -215,7 +215,7 @@ def iter_responses(
 
 # base_url mode, no on_result, raise_on_error=True
 @overload
-def iter_responses(
+def iter_requests(
     *,
     base_url: str,
     max_concurrency: int = 32,
@@ -237,7 +237,7 @@ def iter_responses(
 
 
 @overload
-def iter_responses(
+def iter_requests(
     *,
     base_url: None = None,
     max_concurrency: int = 32,
@@ -262,7 +262,7 @@ def iter_responses(
 
 
 @overload
-def iter_responses(
+def iter_requests(
     *,
     base_url: None = None,
     max_concurrency: int = 32,
@@ -288,7 +288,7 @@ def iter_responses(
 
 # request_fn mode, no on_result, raise_on_error=True
 @overload
-def iter_responses(
+def iter_requests(
     *,
     base_url: None = None,
     max_concurrency: int = 32,
@@ -312,7 +312,7 @@ def iter_responses(
 
 
 @overload
-def iter_responses(
+def iter_requests(
     *,
     base_url: str,
     max_concurrency: int = 32,
@@ -335,7 +335,7 @@ def iter_responses(
 
 
 @overload
-def iter_responses(
+def iter_requests(
     *,
     base_url: str,
     max_concurrency: int = 32,
@@ -359,7 +359,7 @@ def iter_responses(
 
 # base_url mode, with on_result, raise_on_error=True
 @overload
-def iter_responses(
+def iter_requests(
     *,
     base_url: str,
     max_concurrency: int = 32,
@@ -381,7 +381,7 @@ def iter_responses(
 
 
 @overload
-def iter_responses(
+def iter_requests(
     *,
     base_url: None = None,
     max_concurrency: int = 32,
@@ -406,7 +406,7 @@ def iter_responses(
 
 
 @overload
-def iter_responses(
+def iter_requests(
     *,
     base_url: None = None,
     max_concurrency: int = 32,
@@ -432,7 +432,7 @@ def iter_responses(
 
 # request_fn mode, with on_result, raise_on_error=True
 @overload
-def iter_responses(
+def iter_requests(
     *,
     base_url: None = None,
     max_concurrency: int = 32,
@@ -455,7 +455,7 @@ def iter_responses(
 ) -> AsyncIterator[tuple[ItemT, ResultT]]: ...
 
 
-async def iter_responses(
+async def iter_requests(
     *,
     base_url: Optional[str] = None,
     max_concurrency: int = 32,

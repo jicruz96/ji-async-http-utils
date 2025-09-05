@@ -24,10 +24,10 @@ Direct dependencies: `aiohttp`, `tqdm` (plus `httpx`, `rich` for the httpx helpe
 Basic list with `base_url` and a progress label:
 
 ```python
-from ji_async_http_utils.aiohttp import iter_responses
+from ji_async_http_utils.aiohttp import iter_requests
 
 async def main():
-    async for user_id, data in iter_responses(
+    async for user_id, data in iter_requests(
         base_url="https://api.example.com/users",
         items=[1, 2, 3, 4, 5],
         max_concurrency=16,
@@ -57,11 +57,11 @@ async def main():
         print(data["title"])  # e.g., "delectus aut autem"
 ```
 
-### Multiple requests with `iter_responses`
+### Multiple requests with `iter_requests`
 
 ```python
 async def main():
-    async for i, data in iter_responses(
+    async for i, data in iter_requests(
         base_url="https://example.com/docs",
         items=range(1, 101),
         pbar="Docs",
@@ -74,7 +74,7 @@ async def main():
 
 ```python
 async def main():
-    async for i, data in iter_responses(
+    async for i, data in iter_requests(
         base_url="https://api.example.com/items",
         items=range(1, 101),
         retries=3,                # retry 3 times on 429/5xx or client/timeout
@@ -89,7 +89,7 @@ async def main():
 
 ```python
 async def main():
-    async for i, data in iter_responses(
+    async for i, data in iter_requests(
         base_url="https://api.example.com/items",
         items=range(1, 6),
         headers={"Authorization": "Bearer TOKEN"},
@@ -103,13 +103,13 @@ async def main():
 
 ```python
 import aiohttp
-from ji_async_http_utils.aiohttp import iter_responses
+from ji_async_http_utils.aiohttp import iter_requests
 
 async def main():
     timeout = aiohttp.ClientTimeout(total=30)
     connector = aiohttp.TCPConnector(limit=64)
     async with aiohttp.ClientSession(connector=connector, timeout=timeout) as session:
-        async for key, data in iter_responses(
+        async for key, data in iter_requests(
             base_url="https://api.example.com/resources",
             items=["a", "b", "c"],
             session=session,   # reuse this session
@@ -123,19 +123,19 @@ async def main():
 
 ```python
 # On with label
-async for k, data in iter_responses(..., pbar="Downloading"): ...
+async for k, data in iter_requests(..., pbar="Downloading"): ...
 
 # On without label
-async for k, data in iter_responses(..., pbar=True): ...
+async for k, data in iter_requests(..., pbar=True): ...
 
 # Off (default)
-async for k, data in iter_responses(...): ...
+async for k, data in iter_requests(...): ...
 ```
 
 ### Using request_fn (no base_url): build requests per-item
 
 ```python
-from ji_async_http_utils.aiohttp import iter_responses
+from ji_async_http_utils.aiohttp import iter_requests
 import aiohttp
 
 async def make_request(session: aiohttp.ClientSession, item: tuple[int, str]):
@@ -146,7 +146,7 @@ async def make_request(session: aiohttp.ClientSession, item: tuple[int, str]):
 
 async def main():
     items = [(1, "alpha"), (2, "beta"), (3, "gamma")]
-    async for item, data in iter_responses(
+    async for item, data in iter_requests(
         request_fn=make_request,  # base_url must be None in this mode
         items=items,
         max_concurrency=10,
@@ -164,7 +164,7 @@ async def on_error(item, exc):
     # Called right before a failed request raises after retries.
     print("FAIL", item, type(exc).__name__)
 
-async for item, data in iter_responses(
+async for item, data in iter_requests(
     base_url="https://api.example.com/jobs",
     items=range(1, 51),
     on_error=on_error,  # keep default JSON results, but hook errors
@@ -178,13 +178,13 @@ async for item, data in iter_responses(
 When you want exceptions to raise immediately and your code consumes transformed results only:
 
 ```python
-from ji_async_http_utils.aiohttp import iter_responses
+from ji_async_http_utils.aiohttp import iter_requests
 
 async def to_json(item, resp):
     async with resp:
         return await resp.json()
 
-async for item, data in iter_responses(
+async for item, data in iter_requests(
     base_url="https://api.example.com/items",
     items=range(1, 6),
     on_result=to_json,
@@ -198,10 +198,10 @@ async for item, data in iter_responses(
 
 ```python
 import aiohttp
-from ji_async_http_utils.aiohttp import iter_responses
+from ji_async_http_utils.aiohttp import iter_requests
 
 # Use a float (seconds) for total timeout when the function creates the session
-async for item, data in iter_responses(
+async for item, data in iter_requests(
     base_url="https://example.com",
     items=range(10),
     timeout=15.0,
@@ -209,7 +209,7 @@ async for item, data in iter_responses(
     ...
 
 # Or provide a full ClientTimeout
-async for item, data in iter_responses(
+async for item, data in iter_requests(
     base_url="https://example.com",
     items=range(10),
     timeout=aiohttp.ClientTimeout(total=120, connect=5),
@@ -308,7 +308,7 @@ async def cli_entry():
 
 Exports from `ji_async_http_utils.aiohttp`:
 
-- `iter_responses(items=..., ...) -> AsyncIterator[tuple[item, JSON | BaseException]]`
+- `iter_requests(items=..., ...) -> AsyncIterator[tuple[item, JSON | BaseException]]`
 - `request(url=..., session=..., ...) -> aiohttp.ClientResponse` (always raises on failure)
 
 Key parameters:
@@ -318,7 +318,7 @@ Key parameters:
 - `timeout`: total timeout (defaults to 60s if we create the session)
 - `method`: HTTP method literal ("GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS", "TRACE", "CONNECT")
 - `pbar`: progress toggle/label. `True` enables without a label; a string sets the label; `False` disables
-- `raise_on_error`: when `True`, failures are raised; when `False` (default), failures are yielded as Exceptions (only for `iter_responses`)
+- `raise_on_error`: when `True`, failures are raised; when `False` (default), failures are yielded as Exceptions (only for `iter_requests`)
 - `retries`: retry count for retryable statuses/exceptions (429/5xx, client/timeouts)
 - `retry_statuses`: customize which HTTP status codes trigger a retry (default: 429, 500, 502, 503, 504)
 - `on_result` / `on_error`: async hooks for side effects
@@ -326,8 +326,8 @@ Key parameters:
 Return types:
 - Default (no `on_result`): yields parsed JSON (alias `JSON`), not `ClientResponse`.
 - With `on_result`: yields `ResultT` returned by your callback.
-- When `raise_on_error=False` (default), failures are yielded as `Exception` (only for `iter_responses`).
-- When `raise_on_error=True`, failures raise immediately and are not yielded (only for `iter_responses`).
+- When `raise_on_error=False` (default), failures are yielded as `Exception` (only for `iter_requests`).
+- When `raise_on_error=True`, failures raise immediately and are not yielded (only for `iter_requests`).
 
 Type-safety constraints (overloads guide editors):
 
@@ -348,7 +348,7 @@ Exports from `ji_async_http_utils.httpx`:
 
 ## Gotchas & Best Practices
 
-- aiohttp/iter_responses:
+- aiohttp/iter_requests:
   - Response handling: When `on_result` is `None` (default), the helper reads `resp.json()` and closes the response for you; you receive parsed JSON (`JSON`). When you provide `on_result`, you receive the raw `ClientResponse` in that callback and must read/close it there.
   - Error handling: Results are yielded in completion order. Failures are yielded as `Exception` values when `raise_on_error=False` (default) and are raised immediately when `True`.
   - Concurrency: Start with 16–32 in-flight requests; tune by observing 95th percentile latency and error codes (429/5xx). Internal session uses `TCPConnector(limit=max_concurrency)`.
