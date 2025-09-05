@@ -338,4 +338,9 @@ Exports from `ji_async_http_utils.httpx`:
 - httpx helpers:
   - Always call `get_client()` or `http_get()` inside `async with lifespan(): ...` or via a function decorated with `@run_in_lifespan`. Otherwise `get_client()` raises to avoid leaking a global client.
   - `http_get` raises for non-2xx by default; use `raise_on_status_except_for` to allow specific codes (e.g., `[404]`).
-  - The default client (via `create_client`/`lifespan`) uses a 30s timeout, follows redirects, and logs responses to the console.
+- The default client (via `create_client`/`lifespan`) uses a 30s timeout, follows redirects, and logs responses to the console.
+
+
+## License
+
+This project is licensed under the MIT License. See the LICENSE file for details.
