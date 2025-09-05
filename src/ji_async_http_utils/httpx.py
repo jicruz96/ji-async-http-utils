@@ -12,10 +12,13 @@ from typing import (
     ParamSpec,
     Sequence,
     TypeVar,
+    overload,
 )
 
 import httpx
 from rich import print
+
+SetClient = Callable[[], httpx.AsyncClient]
 
 
 async def _log_response(res: httpx.Response) -> None:
@@ -27,7 +30,7 @@ _client_override: ContextVar[Optional[httpx.AsyncClient]] = ContextVar(
 )
 
 
-def create_client() -> httpx.AsyncClient:
+def _default_client() -> httpx.AsyncClient:
     return httpx.AsyncClient(
         timeout=httpx.Timeout(30.0),
         follow_redirects=True,
@@ -54,14 +57,19 @@ def get_client() -> httpx.AsyncClient:
     return override
 
 
-async def http_get(
+async def request(
     url: str,
     *,
+    method: str = "GET",
     headers: Mapping[str, str] | None = None,
     params: Mapping[str, Any] | None = None,
+    json: Any | None = None,
+    data: Any | None = None,
     raise_on_status_except_for: Sequence[int] | None = None,
 ) -> httpx.Response:
-    resp = await get_client().get(url, headers=headers, params=params)
+    resp = await get_client().request(
+        method, url, headers=headers, params=params, json=json, data=data
+    )
     if not resp.is_success and resp.status_code not in set(
         raise_on_status_except_for or []
     ):
@@ -70,12 +78,14 @@ async def http_get(
 
 
 @asynccontextmanager
-async def lifespan() -> AsyncIterator[httpx.AsyncClient]:
+async def lifespan(
+    *, set_client: Optional[SetClient] = None
+) -> AsyncIterator[httpx.AsyncClient]:
     """Provide a per-context client set in a ContextVar and close on exit.
 
     Useful for tests or wrapping a whole command without relying on globals.
     """
-    client = create_client()
+    client = set_client() if set_client is not None else _default_client()
     token = _client_override.set(client)
     try:
         yield client
@@ -88,13 +98,39 @@ T = TypeVar("T")
 P = ParamSpec("P")
 
 
-def run_in_lifespan(func: Callable[P, Awaitable[T]]) -> Callable[P, T]:
-    @wraps(func)
-    def _runner(*args: P.args, **kwargs: P.kwargs) -> T:
-        async def _wrap() -> T:
-            async with lifespan():
-                return await func(*args, **kwargs)
+@overload
+def run_in_lifespan(func: Callable[P, Awaitable[T]]) -> Callable[P, T]: ...
 
-        return asyncio.run(_wrap())
 
-    return _runner
+@overload
+def run_in_lifespan(
+    *, set_client: Optional[SetClient] = ...
+) -> Callable[[Callable[P, Awaitable[T]]], Callable[P, T]]: ...
+
+
+def run_in_lifespan(
+    func: Optional[Callable[P, Awaitable[T]]] = None,
+    *,
+    set_client: Optional[SetClient] = None,
+):
+    """Decorator to run an async function inside a managed httpx lifespan.
+
+    Can be used bare as ``@run_in_lifespan`` or configured with a client factory
+    function: ``@run_in_lifespan(set_client=lambda: httpx.AsyncClient(...))``.
+    """
+
+    def decorator(f: Callable[P, Awaitable[T]]) -> Callable[P, T]:
+        @wraps(f)
+        def _runner(*args: P.args, **kwargs: P.kwargs) -> T:
+            async def _wrap() -> T:
+                async with lifespan(set_client=set_client):
+                    return await f(*args, **kwargs)
+
+            return asyncio.run(_wrap())
+
+        return _runner
+
+    if func is None:
+        return decorator
+    else:
+        return decorator(func)

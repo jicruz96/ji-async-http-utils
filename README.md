@@ -234,16 +234,17 @@ async for item, data in iter_responses(
 
 ## Usage Examples (httpx)
 
-Basic client lifecycle with `lifespan` and `http_get`
+Basic client lifecycle with `lifespan` and `request`
 
 ```python
-from ji_async_http_utils.httpx import lifespan, http_get, get_client
+from ji_async_http_utils.httpx import lifespan, request, get_client
 
 async def main():
     async with lifespan():
         # Simple GET with optional headers/params; raises for non-2xx by default
-        res = await http_get(
+        res = await request(
             "https://httpbin.org/get",
+            method="GET",
             params={"q": "hello"},
             headers={"X-Demo": "1"},
         )
@@ -257,12 +258,12 @@ async def main():
 Allow specific non-2xx without raising
 
 ```python
-from ji_async_http_utils.httpx import lifespan, http_get
+from ji_async_http_utils.httpx import lifespan, request
 
 async def main():
     async with lifespan():
         # 404 is allowed here and will not raise
-        res = await http_get(
+        res = await request(
             "https://httpbin.org/status/404",
             raise_on_status_except_for=[404],
         )
@@ -280,6 +281,40 @@ async def main() -> None:
     print(res.json()["uuid"])  # prints a UUID
 
 main()  # runs with a managed client lifecycle
+```
+
+Configure connection limits (throughput) with `set_client`
+
+```python
+import httpx
+from ji_async_http_utils.httpx import lifespan, run_in_lifespan
+
+# Option A: use lifespan and a factory that sets limits
+async def main():
+    async with lifespan(
+        set_client=lambda: httpx.AsyncClient(
+            transport=httpx.AsyncHTTPTransport(
+                limits=httpx.Limits(
+                    max_connections=32,          # global connections cap
+                    max_keepalive_connections=16, # pooled keep-alive sockets
+                )
+            ),
+            timeout=httpx.Timeout(30.0),
+            follow_redirects=True,
+        )
+    ):
+        ...
+
+# Option B: decorator form
+@run_in_lifespan(
+    set_client=lambda: httpx.AsyncClient(
+        transport=httpx.AsyncHTTPTransport(
+            limits=httpx.Limits(max_connections=32, max_keepalive_connections=16)
+        )
+    )
+)
+async def cli_entry():
+    ...
 ```
 
 
@@ -319,11 +354,11 @@ Type-safety constraints (overloads guide editors):
 
 Exports from `ji_async_http_utils.httpx`:
 
-- `lifespan() -> AsyncIterator[httpx.AsyncClient]`: context manager that creates a configured AsyncClient and sets it in a ContextVar for use by helpers.
+- `lifespan(*, set_client: Optional[Callable[[], httpx.AsyncClient]] = None) -> AsyncIterator[httpx.AsyncClient]`: context manager that creates/sets an AsyncClient (or uses your factory) in a ContextVar for helpers.
 - `get_client() -> httpx.AsyncClient`: returns the context-scoped client; raises if called outside `lifespan()` or `run_in_lifespan`.
 - `create_client() -> httpx.AsyncClient`: constructs the default client (30s timeout, follow_redirects=True, response logging hook).
-- `http_get(url, *, headers=None, params=None, raise_on_status_except_for=None) -> httpx.Response`: GET helper that raises for non-2xx unless allowed.
-- `run_in_lifespan(func) -> Callable[...]`: decorator that runs an async function inside a managed `lifespan` and returns a sync callable.
+- `request(url, *, method="GET", headers=None, params=None, json=None, data=None, raise_on_status_except_for=None) -> httpx.Response`: Request helper that raises for non-2xx unless allowed.
+- `run_in_lifespan(func=None, *, set_client: Optional[Callable[[], httpx.AsyncClient]] = None) -> ...`: decorator that runs an async function inside a managed `lifespan` and returns a sync callable.
 
 ## Gotchas & Best Practices
 
@@ -336,9 +371,10 @@ Exports from `ji_async_http_utils.httpx`:
   - Sessions: Reuse a single `ClientSession` (pass `session=`) to benefit from connection pooling when making many calls.
 
 - httpx helpers:
-  - Always call `get_client()` or `http_get()` inside `async with lifespan(): ...` or via a function decorated with `@run_in_lifespan`. Otherwise `get_client()` raises to avoid leaking a global client.
-  - `http_get` raises for non-2xx by default; use `raise_on_status_except_for` to allow specific codes (e.g., `[404]`).
-- The default client (via `create_client`/`lifespan`) uses a 30s timeout, follows redirects, and logs responses to the console.
+  - Always call `get_client()` or `request()` inside `async with lifespan(): ...` or via a function decorated with `@run_in_lifespan`. Otherwise `get_client()` raises to avoid leaking a global client.
+  - `request` raises for non-2xx by default; use `raise_on_status_except_for` to allow specific codes (e.g., `[404]`).
+  - The default client (via `create_client`/`lifespan`) uses a 30s timeout, follows redirects, and logs responses to the console.
+  - Concurrency vs. connection limits: HTTPX does not queue requests for you. Limit in-flight tasks with your own semaphore/worker pool if needed, and set connection limits with `httpx.Limits(max_connections=..., max_keepalive_connections=...)` via a custom client factory passed to `set_client`.
 
 
 ## License
