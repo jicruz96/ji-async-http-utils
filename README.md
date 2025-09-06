@@ -16,7 +16,7 @@ Requires Python 3.10+.
 pip install ji-async-http-utils
 ```
 
-Direct dependencies: `aiohttp`, `tqdm` (plus `httpx`, `rich` for the httpx helpers).
+Direct dependencies: `aiohttp`, `httpx`, `tqdm`.
 
 
 ## Quickstart
