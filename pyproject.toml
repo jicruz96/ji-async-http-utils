@@ -4,7 +4,7 @@ version = "5.0.0"
 description = "Async HTTP utilities using aiohttp and httpx."
 readme = "README.md"
 authors = [
-    { name = "jicruz96", email = "accounts@jicruz.com" }
+    { name = "J.I. Cruz", email = "ji@jicruz.com" }
 ]
 requires-python = ">=3.10"
 dependencies = [
