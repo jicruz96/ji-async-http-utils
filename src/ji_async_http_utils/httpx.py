@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from contextvars import ContextVar
@@ -16,13 +17,16 @@ from typing import (
 )
 
 import httpx
-from rich import print
+
+logger = logging.getLogger(__name__)
 
 SetClient = Callable[[], httpx.AsyncClient]
 
 
 async def _log_response(res: httpx.Response) -> None:
-    print(f"[http] {res.request.method} {res.request.url} -> {res.status_code}")
+    logger.info(
+        "http %s %s -> %s", res.request.method, res.request.url, res.status_code
+    )
 
 
 _client_override: ContextVar[Optional[httpx.AsyncClient]] = ContextVar(
