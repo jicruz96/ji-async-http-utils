@@ -135,6 +135,7 @@ async def _retry_loop(
     retry_statuses: set[int],
     retry_backoff_base: float,
     retry_backoff_max: float,
+    raise_for_status: bool = False,
 ) -> aiohttp.ClientResponse:
     """Execute an async request factory with retry/backoff rules.
 
@@ -160,7 +161,8 @@ async def _retry_loop(
                 await asyncio.sleep(sleep_for)
                 continue
 
-            resp.raise_for_status()
+            if raise_for_status:
+                resp.raise_for_status()
             return resp
         except (aiohttp.ClientError, asyncio.TimeoutError):
             if attempt < retries:
@@ -664,6 +666,7 @@ async def request(
     retry_backoff_base: float = 0.5,
     retry_backoff_max: float = 5.0,
     retry_statuses: Optional[Sequence[int] | set[int]] = None,
+    raise_for_status: bool = True,
 ) -> aiohttp.ClientResponse:
     """Issue a single HTTP request and return the raw `ClientResponse`.
 
@@ -687,5 +690,6 @@ async def request(
         retry_statuses=effective_retry_statuses,
         retry_backoff_base=retry_backoff_base,
         retry_backoff_max=retry_backoff_max,
+        raise_for_status=raise_for_status,
     )
     return resp
